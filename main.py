@@ -1,24 +1,36 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.responses import FileResponse
 import requests
+import uuid
+import os
 
 app = FastAPI()
 
 class Prompt(BaseModel):
     text: str
 
-DEEPAI_API_KEY = "5190ca90-6102-4fd2-8863-030c14747be1"  # Replace with your real key
+HUGGINGFACE_API_TOKEN = "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"
 
 @app.post("/generate")
 def generate_image(prompt: Prompt):
+    # HuggingFace inference API call
     response = requests.post(
-        "https://api.deepai.org/api/text2img",
-        data={'text': prompt.text},
-        headers={'api-key': DEEPAI_API_KEY}
+        "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2",
+        headers={"Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}"},
+        json={"inputs": prompt.text},
     )
 
-    result = response.json()
-    if "output_url" in result:
-        return {"image_url": result["output_url"]}
+    if response.status_code == 200:
+        # Unique filename for each image
+        filename = f"{uuid.uuid4().hex}.jpg"
+        with open(filename, "wb") as f:
+            f.write(response.content)
+
+        return FileResponse(filename, media_type="image/jpeg", filename=filename)
+    
     else:
-        return {"error": "Image generation failed", "details": result}
+        return {
+            "error": "Image generation failed",
+            "details": response.json()
+        }
